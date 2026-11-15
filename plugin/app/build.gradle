@@ -33,6 +33,9 @@ buildscript {
         return prop.get(key)
     }
 
+    // The signing configuration below (outside this buildscript block) reads local.properties too.
+    ext.getValueFromPropertiesFile = getValueFromPropertiesFile
+
     def getProperty = { name, defValue ->
         def prop = project.properties[name] ?:
                 getValueFromPropertiesFile(project.rootProject.file('local.properties'), name)
