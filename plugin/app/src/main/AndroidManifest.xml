@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.tacticalcomms.atak"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Plugins run inside the ATAK process and use ATAK's permissions;
+         these are listed for documentation / standalone lint only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:description="@string/app_desc"
+        android:extractNativeLibs="true"
+        android:theme="@style/AppTheme">
+
+        <meta-data android:name="plugin-api" android:value="${atakApiVersion}" />
+        <meta-data android:name="app_desc" android:value="@string/app_desc" />
+
+        <!-- allows ATAK to discover this APK as a plugin -->
+        <activity
+            android:name="com.atakmap.app.component"
+            android:exported="true"
+            tools:ignore="MissingClass">
+            <intent-filter android:label="@string/app_name">
+                <action android:name="com.atakmap.app.component" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

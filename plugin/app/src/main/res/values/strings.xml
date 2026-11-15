@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tactical Comms</string>
+    <string name="app_desc">Chat, groups, push-to-talk, voice calls, position sharing and file transfer through your own server.</string>
+</resources>

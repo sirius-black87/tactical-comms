@@ -1,0 +1,16 @@
+# Copy to local.properties and adjust (see the ATAK SDK documentation).
+sdk.dir=/path/to/Android/Sdk
+
+# Signing key: the ATAK SDK ships a debug keystore (android_keystore)
+takDebugKeyFile=/path/to/ATAK-SDK/android_keystore
+takDebugKeyFilePassword=tnttnt
+takDebugKeyAlias=wintec_mapping
+takDebugKeyPassword=tnttnt
+takReleaseKeyFile=/path/to/ATAK-SDK/android_keystore
+takReleaseKeyFilePassword=tnttnt
+takReleaseKeyAlias=wintec_mapping
+takReleaseKeyPassword=tnttnt
+
+# Either place this project at <ATAK-SDK>/plugins/TacticalComms (so ../../atak-gradle-takdev.jar resolves)
+# or point to the takdev jar explicitly:
+#takdev.plugin=/path/to/ATAK-SDK/atak-gradle-takdev.jar

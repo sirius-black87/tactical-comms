@@ -1,0 +1,11 @@
+node_modules/
+server/data/
+server/.env
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+plugin/sdk/
+*.apk
+*.keystore

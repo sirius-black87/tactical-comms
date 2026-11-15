@@ -1,0 +1,6 @@
+{$DOMAIN} {
+	request_body {
+		max_size 250MB
+	}
+	reverse_proxy comms:8080
+}

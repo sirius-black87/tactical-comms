@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ATAKPluginTheme" parent="@android:style/Theme.Holo">
+        <item name="android:buttonStyle">@android:style/Widget.Button</item>
+        <item name="android:editTextStyle">@style/ATAKEditText</item>
+    </style>
+
+    <style name="AppTheme" parent="@android:style/Theme.Holo">
+        <item name="android:buttonStyle">@android:style/Widget.Button</item>
+        <item name="android:editTextStyle">@style/ATAKEditText</item>
+    </style>
+
+    <style name="ATAKEditText" parent="@android:style/Widget.EditText">
+        <!-- non-fullscreen keyboard, as in ATAK -->
+        <item name="android:imeOptions">flagNoFullscreen</item>
+    </style>
+</resources>
