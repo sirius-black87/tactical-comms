@@ -1,27 +1,22 @@
+# Default deployment: reached by IP address, no domain needed.
+# The server encrypts traffic itself with a self-signed certificate that it creates
+# on first start; the plugin pins that certificate (see README).
+# For a deployment behind a domain name with a public certificate, use
+# docker-compose.domain.yml instead.
 services:
   comms:
     build: .
     restart: unless-stopped
+    ports:
+      - "${PORT:-443}:8080"
     environment:
       ACCESS_KEY: ${ACCESS_KEY:?set ACCESS_KEY in .env}
+      TLS_SELF_SIGNED: "1"
       MAX_FILE_MB: ${MAX_FILE_MB:-200}
       FILE_TTL_HOURS: ${FILE_TTL_HOURS:-72}
       PTT_MAX_SECONDS: ${PTT_MAX_SECONDS:-90}
     volumes:
       - comms-data:/data
 
-  # TLS termination with automatic Let's Encrypt certificates
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports: ["80:80", "443:443"]
-    environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-    depends_on: [comms]
-
 volumes:
   comms-data:
-  caddy-data:

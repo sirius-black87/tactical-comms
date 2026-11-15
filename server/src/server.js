@@ -11,7 +11,28 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
+const { execFileSync } = require('child_process');
 const { Store } = require('./store');
+
+/**
+ * Self-signed TLS for servers reached by IP address (no domain, so no public CA
+ * certificate). The certificate is created once and kept in the data directory;
+ * the plugin pins its SHA-256 fingerprint instead of relying on a CA.
+ */
+function ensureSelfSignedCert(dataDir) {
+  const dir = path.join(dataDir, 'tls');
+  const cert = path.join(dir, 'cert.pem');
+  const key = path.join(dir, 'key.pem');
+  if (!fs.existsSync(cert) || !fs.existsSync(key)) {
+    fs.mkdirSync(dir, { recursive: true });
+    execFileSync('openssl', [
+      'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes',
+      '-keyout', key, '-out', cert, '-days', '3650', '-subj', '/CN=tactical-comms',
+    ], { stdio: 'ignore' });
+    fs.chmodSync(key, 0o600);
+  }
+  return { cert, key };
+}
 
 const KIND_PTT = 1;
 const KIND_CALL = 2;
@@ -27,6 +48,7 @@ function createServer(opts = {}) {
     ringTimeoutMs: Number(opts.ringTimeoutSeconds ?? process.env.RING_TIMEOUT_SECONDS ?? 45) * 1000,
     tlsCert: opts.tlsCert ?? process.env.TLS_CERT,
     tlsKey: opts.tlsKey ?? process.env.TLS_KEY,
+    tlsSelfSigned: opts.tlsSelfSigned ?? ['1', 'true', 'yes'].includes(String(process.env.TLS_SELF_SIGNED).toLowerCase()),
     log: opts.log ?? ((...a) => console.log(new Date().toISOString(), ...a)),
   };
   const log = cfg.log;
@@ -402,9 +424,20 @@ function createServer(opts = {}) {
   }
 
   // ---------------------------------------------------------------- wiring
-  const server = cfg.tlsCert && cfg.tlsKey
-    ? https.createServer({ cert: fs.readFileSync(cfg.tlsCert), key: fs.readFileSync(cfg.tlsKey) }, handleHttp)
-    : http.createServer(handleHttp);
+  if (cfg.tlsSelfSigned && !(cfg.tlsCert && cfg.tlsKey)) {
+    const generated = ensureSelfSignedCert(cfg.dataDir);
+    cfg.tlsCert = generated.cert;
+    cfg.tlsKey = generated.key;
+  }
+  let fingerprint = null;
+  let server;
+  if (cfg.tlsCert && cfg.tlsKey) {
+    const certPem = fs.readFileSync(cfg.tlsCert);
+    fingerprint = new crypto.X509Certificate(certPem).fingerprint256;
+    server = https.createServer({ cert: certPem, key: fs.readFileSync(cfg.tlsKey) }, handleHttp);
+  } else {
+    server = http.createServer(handleHttp);
+  }
 
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
 
@@ -493,6 +526,8 @@ function createServer(opts = {}) {
   return {
     cfg,
     server,
+    /** SHA-256 fingerprint of the TLS certificate (AA:BB:...), or null without TLS. */
+    fingerprint,
     listen() {
       return new Promise((resolve) => server.listen(cfg.port, () => resolve(server.address().port)));
     },
@@ -500,8 +535,10 @@ function createServer(opts = {}) {
       clearInterval(heartbeat);
       clearInterval(fileGc);
       for (const ws of wss.clients) ws.terminate();
-      store.flush();
-      return new Promise((resolve) => wss.close(() => server.close(() => resolve())));
+      return new Promise((resolve) => wss.close(() => server.close(() => {
+        store.close();
+        resolve();
+      })));
     },
   };
 }
@@ -513,6 +550,12 @@ if (require.main === module) {
   app.listen().then((port) => {
     app.cfg.log(`Tactical Comms server listening on :${port} (ws path /ws)` +
       (app.cfg.accessKey ? ' [access key required]' : ' [WARNING: no ACCESS_KEY set]'));
+    if (app.fingerprint) {
+      app.cfg.log('TLS enabled. Certificate fingerprint (SHA-256), to compare with the plugin settings:');
+      app.cfg.log('  ' + app.fingerprint);
+    } else {
+      app.cfg.log('WARNING: TLS is off - traffic is NOT encrypted. Set TLS_SELF_SIGNED=1 or put a TLS proxy in front.');
+    }
   });
   const stop = () => app.close().then(() => process.exit(0));
   process.on('SIGINT', stop);

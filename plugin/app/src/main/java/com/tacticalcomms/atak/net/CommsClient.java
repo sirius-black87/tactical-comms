@@ -13,6 +13,8 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import javax.net.ssl.SSLParameters;
+
 /**
  * WebSocket connection to the Tactical Comms server with automatic reconnect.
  * JSON messages are delivered on the main thread; binary audio frames are
@@ -40,12 +42,17 @@ public class CommsClient {
     private int attempt;
     private String url, key, uid, callsign;
     private volatile String token;
+    private TlsPin.Store pinStore;
+    private volatile TlsPin tls;
 
     public CommsClient(Listener listener) { this.listener = listener; }
 
     public State getState() { return state; }
     public String getToken() { return token; }
     public String getUid() { return uid; }
+
+    /** Non-null when the server is addressed by IP over TLS and its certificate is pinned. */
+    public TlsPin getTls() { return tls; }
 
     /** http(s)://host:port derived from the ws(s):// URL, for the file API. */
     public String httpBase() {
@@ -55,7 +62,8 @@ public class CommsClient {
         return scheme + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
     }
 
-    public synchronized void connect(String url, String key, String uid, String callsign) {
+    public synchronized void connect(String url, String key, String uid, String callsign, TlsPin.Store pinStore) {
+        this.pinStore = pinStore;
         this.url = normalize(url);
         this.key = key;
         this.uid = uid;
@@ -137,7 +145,17 @@ public class CommsClient {
         setState(State.CONNECTING, url);
         final WebSocketClient c;
         try {
-            c = new WebSocketClient(URI.create(url)) {
+            URI uri = URI.create(url);
+            final TlsPin pin = "wss".equals(uri.getScheme()) && TlsPin.isIpLiteral(uri.getHost())
+                    ? new TlsPin(pinStore) : null;
+            tls = pin;
+            c = new WebSocketClient(uri) {
+                @Override protected void onSetSSLParameters(SSLParameters p) {
+                    // Pinned: the certificate itself is the identity, there is no host name to check.
+                    // Otherwise keep the library's host name verification (needs Android 7+).
+                    if (pin == null && android.os.Build.VERSION.SDK_INT >= 24) super.onSetSSLParameters(p);
+                }
+
                 @Override public void onOpen(ServerHandshake h) {
                     try {
                         send(new JSONObject().put("t", "hello").put("uid", uid)
@@ -178,7 +196,11 @@ public class CommsClient {
                         if (ws != this) return;
                         ws = null;
                         token = null;
-                        if (code == 4003) {
+                        if (pin != null && pin.mismatch()) {
+                            wanted = false;
+                            setState(State.DISCONNECTED, "server certificate changed - if the server was"
+                                    + " reinstalled, clear the fingerprint in settings");
+                        } else if (code == 4003) {
                             wanted = false;
                             setState(State.AUTH_FAILED, reason);
                         } else if (code == 4004) {
@@ -200,6 +222,7 @@ public class CommsClient {
             wanted = false;
             return;
         }
+        if (tls != null) c.setSocketFactory(tls.socketFactory());
         c.setConnectionLostTimeout(30);
         ws = c;
         c.connect();

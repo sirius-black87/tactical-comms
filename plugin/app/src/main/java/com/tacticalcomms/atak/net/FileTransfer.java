@@ -17,6 +17,8 @@ import java.net.URLEncoder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.net.ssl.HttpsURLConnection;
+
 /** Upload / download of attachments through the server's HTTP file API. */
 public class FileTransfer {
 
@@ -28,13 +30,13 @@ public class FileTransfer {
 
     private final ExecutorService pool = Executors.newFixedThreadPool(2);
 
-    public void upload(final String base, final String token, final File file, final Callback cb) {
+    public void upload(final String base, final String token, final TlsPin tls, final File file, final Callback cb) {
         pool.execute(new Runnable() {
             @Override public void run() {
                 HttpURLConnection c = null;
                 try {
                     String name = URLEncoder.encode(file.getName(), "UTF-8");
-                    c = (HttpURLConnection) new URL(base + "/files?name=" + name).openConnection();
+                    c = open(new URL(base + "/files?name=" + name), tls);
                     c.setRequestMethod("POST");
                     c.setDoOutput(true);
                     c.setConnectTimeout(15000);
@@ -61,14 +63,14 @@ public class FileTransfer {
         });
     }
 
-    public void download(final String base, final String token, final String fileId,
+    public void download(final String base, final String token, final TlsPin tls, final String fileId,
                          final File dest, final Callback cb) {
         pool.execute(new Runnable() {
             @Override public void run() {
                 HttpURLConnection c = null;
                 File tmp = new File(dest.getPath() + ".part");
                 try {
-                    c = (HttpURLConnection) new URL(base + "/files/" + fileId).openConnection();
+                    c = open(new URL(base + "/files/" + fileId), tls);
                     c.setConnectTimeout(15000);
                     c.setReadTimeout(60000);
                     c.setRequestProperty("Authorization", "Bearer " + token);
@@ -96,6 +98,16 @@ public class FileTransfer {
     }
 
     public void shutdown() { pool.shutdownNow(); }
+
+    /** Applies the same certificate pin as the WebSocket when the server is addressed by IP. */
+    private static HttpURLConnection open(URL url, TlsPin tls) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) url.openConnection();
+        if (tls != null && c instanceof HttpsURLConnection) {
+            ((HttpsURLConnection) c).setSSLSocketFactory(tls.socketFactory());
+            ((HttpsURLConnection) c).setHostnameVerifier(tls.hostnameVerifier());
+        }
+        return c;
+    }
 
     private static void copy(InputStream in, OutputStream out, long total, Callback cb) throws IOException {
         byte[] buf = new byte[32 * 1024];

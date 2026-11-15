@@ -36,7 +36,13 @@ class Store {
   }
 
   saveSoon() {
-    if (!this.timer) this.timer = setTimeout(() => this.flush(), 2000);
+    if (!this.timer && !this.closed) this.timer = setTimeout(() => this.flush(), 2000);
+  }
+
+  /** Final write; later changes (e.g. sockets closing during shutdown) are not scheduled. */
+  close() {
+    this.flush();
+    this.closed = true;
   }
 
   save() { this.saveSoon(); }

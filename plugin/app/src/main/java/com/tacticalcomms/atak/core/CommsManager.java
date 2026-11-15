@@ -11,6 +11,7 @@ import com.tacticalcomms.atak.model.User;
 import com.tacticalcomms.atak.net.CommsClient;
 import com.tacticalcomms.atak.net.FileTransfer;
 import com.tacticalcomms.atak.net.Frames;
+import com.tacticalcomms.atak.net.TlsPin;
 import com.tacticalcomms.atak.plugin.Prefs;
 import com.tacticalcomms.atak.ui.Ui;
 
@@ -70,7 +71,16 @@ public class CommsManager implements CommsClient.Listener, PttController.Listene
         }
         MapView mv = MapView.getMapView();
         positions.configure(prefs.shareLocation(), prefs.positionIntervalSec());
-        client.connect(prefs.serverUrl(), prefs.accessKey(), MapView.getDeviceUid(), mv.getDeviceCallsign());
+        client.connect(prefs.serverUrl(), prefs.accessKey(), MapView.getDeviceUid(), mv.getDeviceCallsign(),
+                new TlsPin.Store() {
+                    @Override public String get() { return prefs.certFingerprint(); }
+
+                    @Override public void learned(String fp) {
+                        prefs.setCertFingerprint(TlsPin.format(fp));
+                        Ui.toastLong("Tactical Comms: server certificate saved. Compare with the server log: "
+                                + TlsPin.format(fp).substring(0, 23) + "…");
+                    }
+                });
         positions.start();
     }
 
@@ -162,7 +172,7 @@ public class CommsManager implements CommsClient.Listener, PttController.Listene
     }
 
     private void upload(final ChatMessage m, File f) {
-        files.upload(client.httpBase(), client.getToken(), f, new FileTransfer.Callback() {
+        files.upload(client.httpBase(), client.getToken(), client.getTls(), f, new FileTransfer.Callback() {
             @Override public void onProgress(long done, long total) { }
 
             @Override public void onDone(final JSONObject r, File file) {
@@ -199,7 +209,7 @@ public class CommsManager implements CommsClient.Listener, PttController.Listene
         File recvDir = new File(dir, "received");
         File dest = uniqueFile(recvDir, sanitize(m.fileName));
         Ui.toast("Downloading " + m.fileName + "…");
-        files.download(client.httpBase(), client.getToken(), m.fileId, dest, new FileTransfer.Callback() {
+        files.download(client.httpBase(), client.getToken(), client.getTls(), m.fileId, dest, new FileTransfer.Callback() {
             @Override public void onProgress(long done, long total) { }
 
             @Override public void onDone(JSONObject r, final File file) {

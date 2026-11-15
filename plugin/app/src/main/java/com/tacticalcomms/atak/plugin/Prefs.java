@@ -18,9 +18,14 @@ public class Prefs {
     public boolean shareLocation() { return sp.getBoolean("tc_share_location", true); }
     public int positionIntervalSec() { return sp.getInt("tc_pos_interval", 5); }
 
-    public void save(String url, String key, boolean autoConnect, boolean share, int interval) {
+    /** Pinned TLS certificate fingerprint for servers addressed by IP ("" = trust the first one seen). */
+    public String certFingerprint() { return sp.getString("tc_cert_fp", ""); }
+    public void setCertFingerprint(String fp) { sp.edit().putString("tc_cert_fp", fp).apply(); }
+
+    public void save(String url, String key, String fingerprint, boolean autoConnect, boolean share, int interval) {
         sp.edit()
                 .putString("tc_server_url", url.trim())
+                .putString("tc_cert_fp", fingerprint.trim())
                 .putString("tc_access_key", key)
                 .putBoolean("tc_auto_connect", autoConnect)
                 .putBoolean("tc_share_location", share)

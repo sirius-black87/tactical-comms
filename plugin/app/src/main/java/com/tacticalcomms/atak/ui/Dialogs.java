@@ -48,7 +48,7 @@ final class Dialogs {
         l.setPadding(p, p / 2, p, 0);
 
         l.addView(label(ctx, "Server address"));
-        final EditText url = field(ctx, "wss://comms.example.com", prefs.serverUrl());
+        final EditText url = field(ctx, "203.0.113.10  or  comms.example.com", prefs.serverUrl());
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         l.addView(url);
 
@@ -56,6 +56,12 @@ final class Dialogs {
         final EditText key = field(ctx, "shared key from the server admin", prefs.accessKey());
         key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         l.addView(key);
+
+        l.addView(label(ctx, "Server certificate fingerprint (IP servers only)"));
+        final EditText fp = field(ctx, "empty = trust the first certificate seen", prefs.certFingerprint());
+        fp.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        fp.setTextSize(11);
+        l.addView(fp);
 
         l.addView(label(ctx, "Position update interval (seconds)"));
         final EditText interval = field(ctx, "5", String.valueOf(prefs.positionIntervalSec()));
@@ -72,14 +78,21 @@ final class Dialogs {
         auto.setChecked(prefs.autoConnect());
         l.addView(auto);
 
+        ScrollView scroll = new ScrollView(ctx);  // the form is taller than a landscape screen
+        scroll.addView(l);
+
         new AlertDialog.Builder(Ui.mapContext())
                 .setTitle("Tactical Comms – settings")
-                .setView(l)
+                .setView(scroll)
                 .setPositiveButton("Save & connect", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         int iv;
                         try { iv = Integer.parseInt(interval.getText().toString().trim()); } catch (NumberFormatException e) { iv = 5; }
+                        // a different server cannot have the old server's certificate
+                        boolean sameServer = url.getText().toString().trim().equals(prefs.serverUrl());
+                        boolean fpEdited = !fp.getText().toString().trim().equals(prefs.certFingerprint());
                         prefs.save(url.getText().toString(), key.getText().toString(),
+                                sameServer || fpEdited ? fp.getText().toString() : "",
                                 auto.isChecked(), share.isChecked(), iv);
                         if (mgr.state() != CommsClient.State.DISCONNECTED) mgr.disconnect();
                         mgr.connect();
