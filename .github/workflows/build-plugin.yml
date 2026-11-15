@@ -47,7 +47,7 @@ jobs:
         run: ./setup-sdk.sh
 
       - name: Build plugin APK
-        run: ./gradlew --no-daemon assembleCivDebug
+        run: ./gradlew --no-daemon --stacktrace assembleCivDebug
 
       - name: Collect files
         run: |
